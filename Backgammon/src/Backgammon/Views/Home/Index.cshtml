@@ -1,0 +1,871 @@
+<html xmlns="http://www.w3.org/1999/xhtml" ng-app="Backgammon">
+<!-- <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML> -->
+<HEAD>
+<META NAME="description" content="Backgammon is a PC-Game, which is a part of the '7 by one stroke' package, written in HTML and JavaScript">
+<META NAME="author" content="Lutz Tautenhahn">
+<META NAME="keywords" content="Game, Backgammon, Streich, Stroke, JavaScript">
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<title>Backgammon</title>
+<script language="JavaScript">
+var i, j, MoveType, MoveValue, MaxValue, NDraw;
+player=new Array(2);
+MoveFrom=new Array(4);
+MoveTo=new Array(4);
+player[0]=true;
+player[1]=false;
+point=new Array(26);
+CurClick=new Array(4);
+BestClick=new Array(4);
+var CurDice, BestDice, BestValue;
+bar=new Array(2);
+dice=new Array(2);
+for (i=0; i<2; i++) dice[i]=new Array(4);
+HomePic=new Array(3);
+HomePic[0]=new Image(); HomePic[0].src="bkgm_o0.gif";
+HomePic[1]=new Image(); HomePic[1].src="bkgm_o.gif";
+HomePic[2]=new Image(); HomePic[2].src="bkgm_o1.gif";
+PointPic=new Array(2);
+for (i=0; i<2; i++) PointPic[i]=new Array(3);
+for (i=0; i<2; i++)
+{ for (j=0; j<3; j++) 
+  { PointPic[i][j]=new Image();
+    PointPic[i][j].src="bkgm_p"+i+eval(j+1)+".gif";
+  }
+}
+DicePic=new Array(3);
+for (i=0; i<3; i++) DicePic[i]=new Array(6);
+for (i=0; i<3; i++)
+{ for (j=0; j<6; j++)
+  { DicePic[i][j]=new Image();
+    DicePic[i][j].src="bkgm_d"+i+eval(j+1)+".gif";
+  }
+}
+SpacePic=new Image(); SpacePic.src="bkgm_p.gif";
+function SetPlayer(ii,bb)
+{ player[ii]=bb;
+}
+var IsNetOper = false;
+if (navigator.appName == "Netscape")
+{ if (parseInt(navigator.appVersion)<5) IsNetOper = true;
+}
+if (navigator.userAgent.search("Opera")>=0) IsNetOper = true;
+var RollNewButtonDisabled, OKButtonDisabled, CancelButtonDisabled;
+var RollNewButtonValue, OKButtonValue, CancelButtonValue;
+function RollNewButtonDisable(bb)
+{ if (IsNetOper)
+  { if ((bb)&&(document.Options.RollNewButton.value!=""))
+    { RollNewButtonValue=document.Options.RollNewButton.value;
+      document.Options.RollNewButton.value="";
+    }
+    if ((! bb)&&(document.Options.RollNewButton.value==""))
+      document.Options.RollNewButton.value=RollNewButtonValue;
+  }
+  else document.Options.RollNewButton.disabled=bb;
+  RollNewButtonDisabled=bb;
+}
+function OKButtonDisable(bb)
+{ if (IsNetOper)
+  { if ((bb)&&(document.Options.OKButton.value!=""))
+    { OKButtonValue=document.Options.OKButton.value;
+      document.Options.OKButton.value="";
+    }
+    if ((! bb)&&(document.Options.OKButton.value==""))
+      document.Options.OKButton.value=OKButtonValue;
+  }
+  else document.Options.OKButton.disabled=bb;
+  OKButtonDisabled=bb;
+}
+function CancelButtonDisable(bb)
+{ if (IsNetOper)
+  { if ((bb)&&(document.Options.CancelButton.value!=""))
+    { CancelButtonValue=document.Options.CancelButton.value;
+      document.Options.CancelButton.value="";
+    }
+    if ((! bb)&&(document.Options.CancelButton.value==""))
+      document.Options.CancelButton.value=CancelButtonValue;
+  }
+  else document.Options.CancelButton.disabled=bb;
+  CancelButtonDisabled=bb;
+}
+function random(nn)
+{ return(Math.floor(Math.random()*1000)%nn);
+}
+function Init()
+{ var ii;
+  for (ii=0; ii<26; ii++) point[ii]=0;
+  point[1]=-2;
+  point[6]=5;
+  point[8]=3;
+  point[12]=-5;
+  point[13]=5;
+  point[17]=-3;
+  point[19]=-5;
+  point[24]=2;
+  for (ii=0; ii<2; ii++) bar[ii]=0;
+  for (ii=0; ii<4; ii++) dice[0][ii]=0;
+  for (ii=0; ii<4; ii++) dice[1][ii]=0;
+  MoveType=-1;
+  NDraw=0;
+  for (ii=0; ii<4; ii++) { MoveFrom[ii]=-1; MoveTo[ii]=-1; }
+  RefreshScreen();
+  document.Options.Msg.value="Roll the dice !";
+  document.Options.RollNewButton.value="Roll Dice";
+  RollNewButtonDisable(false);
+  document.Options.OKButton.value="OK";
+  OKButtonDisable(true);
+  CancelButtonDisable(true);
+  document.Options.Score0.value=167;
+  document.Options.Score1.value=167;
+}
+function Timer()
+{ if (MoveType<0) return;
+  if (NDraw>0)
+  { if (BestDice>0)
+    { document.Options.Msg.value="Switching dice ...";
+      SwitchDice(MoveType,2);
+      BestDice=0;
+      return;
+    }
+    for (var ii=3; ii>=0; ii--)
+    { if (BestClick[ii]>=0)
+      { if (BestClick[ii]==0) ClickBar(MoveType,2);
+        else ClickPoint(BestClick[ii],2);
+        document.Options.Msg.value="Moving ...";
+        BestClick[ii]=-1;
+        NDraw++
+        return;
+      }
+    }
+    if (NDraw==1)
+    { document.Options.Msg.value="I must pass.";
+      NDraw++;
+      return;
+    }
+    document.Options.Msg.value="";
+    OKClick(false);
+    NDraw=0;
+  }
+  else
+  { if (! player[MoveType]) 
+    { if ((document.Options.RollNewButton.value!="Roll Dice")&&(RollNewButtonValue!="Roll Dice"))
+      { CancelClick(true);
+        GetMaxValue(true);
+      }
+      else
+      { document.Options.Msg.value="Rolling dice ...";
+        RollDice(true);
+      }
+      NDraw=1;
+    }
+  }
+}
+function RollDice(ee)
+{ if (MoveType<0)
+  { do
+    { dice[0][1]=random(6)+1;
+      dice[1][2]=random(6)+1;
+    }
+    while(dice[0][1]==dice[1][2])
+    MoveValue=0;
+    MaxValue=dice[0][1]+dice[1][2];
+    RefreshDice();
+    if (dice[0][1]>dice[1][2])
+      document.Options.Msg.value="Green begins.";
+    else
+      document.Options.Msg.value="Yellow begins.";
+  }
+  if (MoveType>=0)
+  { dice[MoveType][1]=random(6)+1;
+    dice[MoveType][2]=random(6)+1;
+    if (dice[MoveType][1]==dice[MoveType][2])
+    { dice[MoveType][0]=dice[MoveType][2];
+      dice[MoveType][3]=dice[MoveType][2];
+    }
+    else
+    { dice[MoveType][0]=0;
+      dice[MoveType][3]=0;
+    }
+    MoveValue=0;
+    GetMaxValue(ee);
+    RefreshDice();
+    if (player[MoveType]) document.Options.Msg.value="Click point or dice !";
+  }
+}
+function Evaluate(vv)
+{ if (vv==0) return;
+  var ii, ss0=0, ss1=0, ff0=0, ff1=25, ss, iinv=-1;
+  for (ii=1; ii<25; ii++)
+  { if (point[ii]<0)//yellow pieces
+    { ss1+=(ii-25)*point[ii];//moves to do by yellow pieces
+      ss1+=-point[ii]*(ii-12.5)*(ii-12.5)/50;//keep the stones in the middle
+      if (iinv==-1) iinv=0;//yellow pieces found
+      if (ff1>ii) ff1=ii;//find last yellow piece
+    }
+    if (point[ii]>0)//green pieces
+    { ss0+=ii*point[ii];
+      ss0+=point[ii]*(ii-12.5)*(ii-12.5)/50;//keep the stones in the middle
+      if (iinv==0) iinv=1;//green pieces found after yellow pieces -> inversion
+      if (ff0<ii) ff0=ii;//find last green piece
+    }
+  }
+  if (bar[0]>0)
+  { ss0+=bar[0]*32;//the way, green pieces have to go = 25 + bonus for capturing
+    ff0=25;//position of the last green piece
+  }
+  if (bar[1]>0)
+  { ss1+=bar[1]*32;//the way, yellow pieces have to go = 25 + bonus for capturing
+    ff1=0;//position of the last yellow piece
+  }
+  if (MoveType==0)//evaluate from green point of view
+  { ss=ss1-ss0;
+    if ((iinv>0)||(bar[1]>0))//there's an inversion
+    { for (ii=1; ii<25; ii++)
+      { if ((point[ii]==1)&&(ff1<ii)) ss-=(25-ii)/3;//can be captured
+        if (point[ii]>1) ss+=3;
+      }
+    }
+    else
+    { for (ii=1; ii<=6; ii++)
+      { if (point[ii]!=0) ss+=3;
+      }
+    }
+    ss+=point[0]*3;
+  }
+  else//evaluate from yellow point of view
+  { ss=ss0-ss1;
+    if ((iinv>0)||(bar[0]>0))//there's an inversion
+    { for (ii=1; ii<25; ii++)
+      { if ((point[ii]==-1)&&(ff0>ii)) ss-=ii/3;//can be captured
+        if (point[ii]<-1) ss+=3;
+      }
+    }
+    else
+    { for (ii=19; ii<=24; ii++)
+      { if (point[ii]!=0) ss+=3;
+      }
+    }
+    ss-=point[25]*3;
+  }
+  ss+=Math.random()/100;
+  if ((MaxValue<vv)||(BestValue<ss))
+  { MaxValue=vv;
+    BestValue=ss;
+    BestDice=CurDice;
+    for (ii=0; ii<4; ii++)
+    { BestClick[ii]=CurClick[ii];
+    }
+  }
+}
+function VirtualClick(jj, ee, vv)
+{ if (jj==0)
+  { if (MaxValue<=vv)
+    { if (ee) Evaluate(vv);
+      else MaxValue=vv;
+    }
+    return;
+  }
+  var ii, jjj=jj-1, nn;
+  if (bar[MoveType]>0)
+  { CurClick[jjj]=0;
+    nn=ClickBar(MoveType,false);
+    if (nn>0)
+    { nn+=vv;
+      VirtualClick(jjj, ee, nn);
+      CancelClick(false);
+    }
+    else VirtualClick(0, ee, vv);
+  }
+  else
+  { for (ii=1; ii<=24; ii++)
+    { CurClick[jjj]=ii;
+      nn=ClickPoint(ii,false);
+      if (nn>0)
+      { nn+=vv;
+        VirtualClick(jjj, ee, nn);
+        CancelClick(false);
+      }
+      else VirtualClick(0, ee, vv);
+    }
+  }
+}
+function GetMaxValue(ee)
+{ var nn1, nn2, mm=dice[MoveType][0]+dice[MoveType][1]+dice[MoveType][2]+dice[MoveType][3];
+  MaxValue=0;
+  if (ee)
+  { for (nn1=0; nn1<4; nn1++) CurClick[nn1]=-1;
+    CurDice=0;
+    BestDice=0;
+    BestValue=-9999;
+  }
+  if (dice[MoveType][0]==0)
+  { VirtualClick(2,ee,0);
+    if (!ee &&(MaxValue==mm)) return;
+    SwitchDice(MoveType,false);
+    if (ee) CurDice=1;
+    VirtualClick(2,ee,0);
+    SwitchDice(MoveType,false);
+  }
+  else VirtualClick(4,ee,0);
+}
+function RollNewClick(vv)
+{ if ((IsNetOper)&&(vv)&&(document.Options.RollNewButton.value=="")) return;
+  if ((document.Options.RollNewButton.value=="Roll Dice")||(RollNewButtonValue=="Roll Dice"))
+  { if ((MoveType>0)&&(! player[MoveType])) return;
+    RollDice(false);
+    document.Options.RollNewButton.value="New Game";
+    RollNewButtonValue="New Game";
+    if (MoveType<0) OKButtonDisable(false);
+    else
+    { if (MaxValue==0)
+      { document.Options.Msg.value="You must pass !";
+        document.Options.OKButton.value="Pass";
+        OKButtonDisable(false);
+      }
+    }
+  }
+  else
+  { if ((document.Options.Score0.value=="0")||(document.Options.Score1.value=="0")) Init();
+    else
+    { if (confirm("Do you really want to surrender the current game ?")) Init();
+    }
+  }
+}
+function OKClick(vv)
+{ if ((IsNetOper)&&(vv)&&(document.Options.OKButton.value=="")) return;
+  if (MoveType<0)
+  { if (dice[0][1]>dice[1][2])
+    { dice[0][2]=dice[1][2];
+      dice[1][2]=0;
+      MoveType=0;
+    }
+    else
+    { dice[1][1]=dice[1][2];
+      dice[1][2]=dice[0][1];
+      dice[0][1]=0;
+      MoveType=1;
+    }
+    if (player[MoveType]) document.Options.Msg.value="Click point or dice !";
+    OKButtonDisable(true);
+    if (player[MoveType]) RollNewButtonDisable(false);
+    else RollNewButtonDisable(true);
+    RefreshDice();
+  }
+  else
+  { dice[MoveType][0]=0;
+    dice[MoveType][1]=0;
+    dice[MoveType][2]=0;
+    dice[MoveType][3]=0;
+    RefreshDice();
+    MoveType=1-MoveType;
+    if (player[MoveType])
+    { RollNewButtonDisable(false);
+      document.Options.Msg.value="Roll the dice !";
+    }
+    else RollNewButtonDisable(true);
+    if (document.Options.RollNewButton.value=="New Game")
+      document.Options.RollNewButton.value="Roll Dice";
+    if (RollNewButtonValue=="New Game") RollNewButtonValue="Roll Dice";
+    document.Options.OKButton.value="OK";
+    OKButtonDisable(true);
+    CancelButtonDisable(true);
+    var ii, ss=0;
+    for (ii=1; ii<25; ii++)
+    { if (point[ii]>0)
+        ss+=ii*point[ii];
+    }
+    ss+=bar[0]*25;
+    document.Options.Score0.value=ss;
+    if (ss==0)
+    { RollNewButtonDisable(false);
+      document.Options.RollNewButton.value="New Game";
+      RollNewButtonValue="New Game";
+      document.Options.Msg.value="Green has won !";
+      MoveType=-1;
+    }
+    ss=0;
+    for (ii=1; ii<25; ii++)
+    { if (point[ii]<0)
+        ss-=(25-ii)*point[ii];
+    }
+    ss+=bar[1]*25;
+    document.Options.Score1.value=ss;
+    if (ss==0)
+    { RollNewButtonDisable(false);
+      document.Options.RollNewButton.value="New Game";
+      RollNewButtonValue="New Game";
+      document.Options.Msg.value="Yellow has won !";
+      MoveType=-1;
+    }    
+  }
+}
+function CancelClick(vv)
+{ if ((IsNetOper)&&(vv)&&(document.Options.CancelButton.value=="")) return;
+  if (MoveType<0) return;
+  var mm, dd=3;
+  MoveValue=0;
+  while ((dd>=0)&&(dice[MoveType][dd]>=0)) dd--;
+  if (dd<0)
+  { if (vv)
+    { RefreshDice();
+      OKButtonDisable(true);
+      CancelButtonDisable(true);
+    }
+    return;
+  }
+  dice[MoveType][dd]*=-1;
+  if (MoveType==0)
+  { if (MoveFrom[dd]==25)
+    { bar[0]++;
+      if (vv) RefreshBar(0);
+    }
+    else
+    { point[MoveFrom[dd]]++;
+      if (vv) RefreshPoint(MoveFrom[dd]);
+    }
+    mm=MoveFrom[dd]-dice[0][dd];
+    if (mm<0) mm=0;
+    point[mm]=MoveTo[dd];
+    if (vv) RefreshPoint(mm);
+    if (MoveTo[dd]<0)
+    { bar[1]--;
+      if (vv) RefreshBar(1);
+    }
+  }
+  else
+  { if (MoveFrom[dd]==0)
+    { bar[1]++;
+      if (vv) RefreshBar(1);
+    }
+    else
+    { point[MoveFrom[dd]]--;
+      if (vv) RefreshPoint(MoveFrom[dd]);
+    }
+    mm=MoveFrom[dd]+dice[1][dd];
+    if (mm>25) mm=25;
+    point[mm]=MoveTo[dd];
+    if (vv) RefreshPoint(mm);
+    if (MoveTo[dd]>0)
+    { bar[0]--;
+      if (vv) RefreshBar(0);
+    }
+  }
+  if (vv) CancelClick(vv);
+}
+function RefreshScreen()
+{ var ii;
+  for (ii=0; ii<26; ii++) RefreshPoint(ii);
+  for (ii=0; ii<2; ii++) RefreshBar(ii);
+  for (ii=0; ii<2; ii++) RefreshDice(ii);
+}
+function NumPieces(nn, jj)
+{ if (nn>2*jj) return(3);
+  if (nn>jj) return(2);
+  return(1);
+}
+function RefreshPoint(ii)
+{ var jj, kk, nn=point[ii];
+  if (ii==0)
+  { for (jj=0; jj<15; jj++)
+    { if (nn==0) window.document.images[173-jj].src = HomePic[1].src;
+      if (nn>0) { window.document.images[173-jj].src = HomePic[0].src; nn--; }
+    }
+  }
+  if (ii==25)
+  { for (jj=0; jj<15; jj++)
+    { if (nn==0) window.document.images[143+jj].src = HomePic[1].src;
+      if (nn<0) { window.document.images[143+jj].src = HomePic[2].src; nn++; }
+    }
+  }
+  if ((ii>0)&&(ii<=6))
+  { for (jj=0; jj<5; jj++)
+    { if (nn==0) window.document.images[143-ii-6*jj].src = SpacePic.src;
+      else
+      { kk=NumPieces(Math.abs(nn),5-jj);
+        if (nn>0)
+        { window.document.images[143-ii-6*jj].src = PointPic[0][kk-1].src;
+          nn-=kk;
+        }
+        else
+        { window.document.images[143-ii-6*jj].src = PointPic[1][kk-1].src;
+          nn+=kk;
+        }
+      }
+    }
+  }
+  if ((ii>6)&&(ii<=12))
+  { for (jj=0; jj<5; jj++)
+    { if (nn==0) window.document.images[72-ii-6*jj].src = SpacePic.src;
+      else
+      { kk=NumPieces(Math.abs(nn),5-jj);
+        if (nn>0)
+        { window.document.images[72-ii-6*jj].src = PointPic[0][kk-1].src;
+          nn-=kk;
+        }
+        else
+        { window.document.images[72-ii-6*jj].src = PointPic[1][kk-1].src;
+          nn+=kk;
+        }
+      }
+    }
+  }
+  if ((ii>12)&&(ii<=18))
+  { for (jj=0; jj<5; jj++)
+    { if (nn==0) window.document.images[ii-13+6*jj].src = SpacePic.src;
+      else
+      { kk=NumPieces(Math.abs(nn),5-jj);
+        if (nn>0)
+        { window.document.images[ii-13+6*jj].src = PointPic[0][kk-1].src;
+          nn-=kk;
+        }
+        else
+        { window.document.images[ii-13+6*jj].src = PointPic[1][kk-1].src;
+          nn+=kk;
+        }
+      }
+    }
+  }
+  if ((ii>18)&&(ii<=24))
+  { for (jj=0; jj<5; jj++)
+    { if (nn==0) window.document.images[ii+58+6*jj].src = SpacePic.src;
+      else
+      { kk=NumPieces(Math.abs(nn),5-jj);
+        if (nn>0)
+        { window.document.images[ii+58+6*jj].src = PointPic[0][kk-1].src;
+          nn-=kk;
+        }
+        else
+        { window.document.images[ii+58+6*jj].src = PointPic[1][kk-1].src;
+          nn+=kk;
+        }
+      }
+    }
+  }
+}
+function RefreshBar(ii)
+{ var jj, kk, nn=bar[ii];
+  if (ii==0)
+  { for (jj=0; jj<5; jj++)
+    { if (nn==0) window.document.images[66+jj].src = SpacePic.src;
+      else
+      { kk=NumPieces(nn,5-jj);
+        window.document.images[66+jj].src = PointPic[ii][kk-1].src;
+        nn-=kk;
+      }
+    }
+  }
+  else
+  { for (jj=0; jj<5; jj++)
+    { if (nn==0) window.document.images[76-jj].src = SpacePic.src;
+      else
+      { kk=NumPieces(nn,5-jj);
+        window.document.images[76-jj].src = PointPic[ii][kk-1].src;
+        nn-=kk;
+      }
+    }
+  }
+}
+function RefreshDice()
+{ for (ii=0; ii<4; ii++)
+  { if (dice[0][ii]==0)
+      window.document.images[108+ii].src = SpacePic.src;
+    else
+    { if (dice[0][ii]>0) window.document.images[108+ii].src = DicePic[0][dice[0][ii]-1].src;
+      else window.document.images[108+ii].src = DicePic[2][-1-dice[0][ii]].src;
+    }
+    if (dice[1][ii]==0)
+      window.document.images[31+ii].src = SpacePic.src;
+    else
+    { if (dice[1][ii]>0) window.document.images[31+ii].src = DicePic[1][dice[1][ii]-1].src;
+      else window.document.images[31+ii].src = DicePic[2][-1-dice[1][ii]].src;
+    }
+  }
+}
+function ClickPoint(nn,vv)
+{ if (MoveType<0) return(0);
+  if ((vv==1)&&(! player[MoveType])) return(0);
+  if (point[nn]==0) return(0);
+  if ((point[nn]<0)&&(MoveType==0)||(point[nn]>0)&&(MoveType==1))  return(0);
+  if (bar[MoveType]>0) return(0);
+  var mm, ii, dd=0;
+  while ((dd<=3)&&(dice[MoveType][dd]<=0)) dd++;
+  if (dd==4) return(0);
+  if (MoveType==0)
+  { mm=nn-dice[0][dd];
+    if (mm<=0)
+    { mm=0;
+      for (ii=7; ii<25; ii++)
+      { if (point[ii]>0) return(0);
+      }
+    }
+    if (point[mm]<-1) return(0);
+    MoveFrom[dd]=nn;
+    MoveTo[dd]=point[mm];
+    point[nn]--;
+    if (vv>0) RefreshPoint(nn);
+    point[mm]++;
+    if (point[mm]==0)
+    { bar[1]++;
+      if (vv>0) RefreshBar(1);
+      point[mm]++;
+    }
+    if (vv>0) RefreshPoint(mm);
+    MoveValue+=nn-mm;
+    if ((vv==1) &&(MoveValue==MaxValue)) OKButtonDisable(false);
+    dice[0][dd]*=-1;
+    if (vv>0)
+    { RefreshDice(0);
+      document.Options.Msg.value="";
+    }
+    if (vv==1) CancelButtonDisable(false);
+    return(nn-mm);
+  }
+  else
+  { mm=nn+dice[1][dd];
+    if (mm>=25)
+    { mm=25;
+      for (ii=1; ii<19; ii++)
+      { if (point[ii]<0) return(0);
+      }
+    }
+    if (point[mm]>1) return(0);
+    MoveFrom[dd]=nn;
+    MoveTo[dd]=point[mm];
+    point[nn]++;
+    if (vv>0) RefreshPoint(nn);
+    point[mm]--;
+    if (point[mm]==0)
+    { bar[0]++;
+      if (vv>0) RefreshBar(0);
+      point[mm]--;
+    }
+    if (vv>0) RefreshPoint(mm);
+    MoveValue+=mm-nn;
+    if ((vv==1) &&(MoveValue==MaxValue)) OKButtonDisable(false);
+    dice[1][dd]*=-1;
+    if (vv>0)
+    { RefreshDice(1);
+      document.Options.Msg.value="";
+    }
+    if (vv==1) CancelButtonDisable(false);
+    return(mm-nn);
+  }
+}
+function ClickBar(nn, vv)
+{ if (MoveType!=nn) return(0);
+  if ((vv==1)&&(! player[nn])) return(0);
+  if (bar[nn]==0) return(0);
+  dd=0;
+  while ((dd<=3)&&(dice[MoveType][dd]<=0)) dd++;
+  if (dd==4) return(0);
+  if (MoveType==0)
+  { if (point[25-dice[0][dd]]<-1) return(0);
+    MoveFrom[dd]=25;
+    MoveTo[dd]=point[25-dice[0][dd]];
+    bar[nn]--;
+    if (vv>0) RefreshBar(nn);
+    point[25-dice[0][dd]]++;
+    if (point[25-dice[0][dd]]==0)
+    { bar[1]++;
+      if (vv>0) RefreshBar(1);
+      point[25-dice[0][dd]]++;
+    }
+    if (vv>0) RefreshPoint(25-dice[0][dd]);
+    MoveValue+=dice[0][dd];
+    if ((vv==1)&&(MoveValue==MaxValue)) OKButtonDisable(false);
+    dice[0][dd]*=-1;
+    if (vv>0)
+    { RefreshDice(0);
+      document.Options.Msg.value="";
+    }
+    if (vv==1) CancelButtonDisable(false);
+    return(-dice[0][dd]);
+  }
+  else
+  { if (point[dice[1][dd]]>1) return(0);
+    MoveFrom[dd]=0;
+    MoveTo[dd]=point[dice[1][dd]];
+    bar[nn]--;
+    if (vv>0) RefreshBar(nn);
+    point[dice[1][dd]]--;
+    if (point[dice[1][dd]]==0)
+    { bar[0]++;
+      if (vv>0) RefreshBar(0);
+      point[dice[1][dd]]--;
+    }
+    if (vv>0) RefreshPoint(dice[1][dd]);
+    MoveValue+=dice[1][dd];
+    if ((vv==1) &&(MoveValue==MaxValue)) OKButtonDisable(false);
+    dice[1][dd]*=-1;
+    if (vv>0)
+    { RefreshDice(1);
+      document.Options.Msg.value="";
+    }
+    if (vv==1) CancelButtonDisable(false);
+    return(-dice[1][dd]);
+  }
+}
+function SwitchDice(nn, vv)
+{ if (MoveType<0) return(false);
+  if (nn!=MoveType) return(false);
+  if ((vv==1)&&(! player[nn])) return(false);
+  if ((vv==1)&&(! CancelButtonDisabled)) return(false);
+  var tt=dice[nn][1];
+  dice[nn][1]=dice[nn][2];
+  dice[nn][2]=tt;
+  if (vv>0) RefreshDice();
+  return(true);
+}
+function Resize()
+{ if(navigator.appName == "Netscape") history.go(0);
+}
+function HelpClick()
+{ alert("Backgammon is an ancient game for two players."+
+      "\nWhen it is your turn click on \"Role Dice\" and"+
+      "\nafter that on your pieces you want to move"+
+      "\naccording to the values of the dice. Before you"+
+      "\ndo so, you can click on the dice to switch the"+
+      "\norder of the move values. When you roll doubles,"+
+      "\nyou must play the numbers twice. When you are done"+
+      "\nclick the \"OK\" button, otherwise click on \"Cancel\""+
+      "\nand move with another piece. When you jump on a"+
+      "\nso-called point which is occupied by a single piece"+
+      "\nof the opponent then that piece goes to the bar"+
+      "\nand must start again. It is not possible to jump on"+
+      "\na point which is occupied by more than one of the"+
+      "\nopponent's pieces. As long as pieces of a player"+
+      "\nare on the bar, these pieces must be moved first"+
+      "\nand the player may not move other pieces. The first"+
+      "\nplayer to bear off all of his pieces wins the game."+
+      "\nA piece may only be moved off the board, when all"+
+      "\nof the players pieces are in his home board. A player"+
+      "\nmust then always bear off those pieces which"+
+      "\nrequire the highest possible move values.");
+}
+</script>
+</HEAD>
+<BODY bgcolor=#FFCC88 onResize="javascript:Resize()">
+<FORM name="Options">
+<DIV ALIGN=center>
+<script language="JavaScript">
+document.open("text/plain");
+document.write("<table border cellpadding=2 cellspacing=8 bgcolor=#E79A26><tr>");
+
+document.write("<td><table noborder cellpadding=0 cellspacing=0 background=\"bkgm_bg.gif\"><tr><td>");
+for (i=0; i < 5; i++)
+{ document.write("<nobr>");
+  for (j=0; j < 6; j++)
+    document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"ClickPoint("+eval(13+j)+",1)\">");
+  document.write("</nobr><br>");
+}
+document.write("<nobr>");
+for (j=0; j < 2; j++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0>");
+for (j=0; j < 2; j++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"SwitchDice(1,1)\">");
+for (j=0; j < 2; j++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0>");
+document.write("</nobr><br>");
+for (i=0; i < 5; i++)
+{ document.write("<nobr>");
+  for (j=0; j < 6; j++)
+    document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"ClickPoint("+eval(12-j)+",1)\">");
+  document.write("</nobr><br>");
+}
+document.write("</td></tr></table></td>");
+document.write("<td><table noborder cellpadding=0 cellspacing=0 bgcolor=#9F540A><tr><td>");
+for (i=0; i < 5; i++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"ClickBar(0,1)\"><br>");
+document.write("<IMG src=\"bkgm_p.gif\" border=0><br>");
+for (i=0; i < 5; i++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"ClickBar(1,1)\"><br>");
+document.write("</td></tr></table></td>");
+document.write("<td><table noborder cellpadding=0 cellspacing=0 background=\"bkgm_bg.gif\"><tr><td>");
+for (i=0; i < 5; i++)
+{ document.write("<nobr>");
+  for (j=0; j < 6; j++)
+    document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"ClickPoint("+eval(19+j)+",1)\">");
+  document.write("</nobr><br>");
+}
+document.write("<nobr>");
+for (j=0; j < 2; j++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0>");
+for (j=0; j < 2; j++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"SwitchDice(0,1)\">");
+for (j=0; j < 2; j++)
+  document.write("<IMG src=\"bkgm_p.gif\" border=0>");
+document.write("</nobr><br>");
+for (i=0; i < 5; i++)
+{ document.write("<nobr>");
+  for (j=0; j < 6; j++)
+    document.write("<IMG src=\"bkgm_p.gif\" border=0 onMouseDown=\"ClickPoint("+eval(6-j)+",1)\">");
+  document.write("</nobr><br>");
+}
+document.write("</td></tr></table></td>");
+document.write("<td><table noborder cellpadding=0 cellspacing=0 bgcolor=#9F540A><tr><td>");
+for (j=0; j < 15; j++)
+  document.write("<IMG src=\"bkgm_o.gif\" border=0><br>");
+document.write("<IMG src=\"bkgm_p.gif\" border=0><br>");
+for (j=0; j < 15; j++)
+  document.write("<IMG src=\"bkgm_o.gif\" border=0><br>");
+document.write("</td></tr></table></td></tr></table>");
+document.close();
+</script>
+<table noborder cellpadding=3 cellspacing=0 width=600>
+<tr><td align=left width=25%>
+<table border cellpadding=2 cellspacing=2 bgcolor=#E79A26 width=100%><tr><td><table noborder cellpadding=0 cellspacing=0>
+<tr><td rowspan=2><img src="bkgm_p01.gif"></td><td><nobr><input type=radio name="Green" checked value="Green: Player" onClick="javascript:SetPlayer(0,true)"><b>Player</b></nobr></td></tr>
+<tr><td><nobr><input type=radio name="Green" value="Green: Computer" onClick="javascript:SetPlayer(0,false)"><b>Computer</b></nobr></td></tr>
+</table></td></tr></table>
+</td>
+<td align=center width=50%>
+<table noborder cellpadding=0 cellspacing=1 width=100%>
+<tr><td align=center width=100%>
+<table noborder cellpadding=0 cellspacing=1 width=100%><tr>
+<td align=left>
+<input type=button name="RollNewButton" value="New Game" style="width:75px;font-size:13px" width=70 onClick="javascript:RollNewClick(true)">
+</td>
+<td align=center>
+<input type=button name="OKButton" value="OK" style="width:75px;font-size:13px"  width=70 enabled onClick="javascript:OKClick(true)">
+</td>
+<td align=center>
+<input type=button name="CancelButton" value="Cancel" style="width:75px;font-size:13px"  width=70 enabled onClick="javascript:CancelClick(true)">
+</td>
+<td align=right>
+<input type=button name="HelpButton" value="Help" style="width:60px;font-size:13px"  width=55 enabled onClick="javascript:HelpClick()">
+</td>
+</tr></table>
+</td>
+</tr>
+<tr><td align=center width=100%>
+<table noborder cellpadding=0 cellspacing=1 width=100%><tr>
+<td align=left>
+<input type=button value="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" style="width:35; background-color:#40FF80" name="Score0">
+</td>
+<td align=center>
+<input size=26 name="Msg" readonly>
+</td>
+<td align=right>
+<input type=button value="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" style="width:35; background-color:#FFFF80" name="Score1">
+</td>
+</tr></table>
+</td>
+</tr></table>
+</td>
+<td align=right width=25%>
+<table border cellpadding=2 cellspacing=2 bgcolor=#E79A26 width=100%><tr><td><table noborder cellpadding=0 cellspacing=0>
+<tr><td rowspan=2><img src="bkgm_p11.gif"></td><td><nobr><input type=radio name="Yellow" value="Yellow: Player" onClick="javascript:SetPlayer(1,true)"><b>Player</b></nobr></td></tr>
+<tr><td><nobr><input type=radio name="Yellow" checked value="Yellow: Computer" onClick="javascript:SetPlayer(1,false)"><b>Computer</b></nobr></td></tr>
+</table></td></tr></table>
+</td>
+</tr>
+</table>
+<script language="JavaScript">
+Init();
+setInterval("Timer()",1000);
+</script>
+</DIV>
+</FORM>
+</BODY>
+</HTML>
+</html>
